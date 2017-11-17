@@ -160,6 +160,7 @@ void Run(const string& pose_graph_filename,
 
   const string tracking_frame =
       lua_parameter_dictionary.GetString("tracking_frame");
+  const string frame_to_be_excluded = lua_parameter_dictionary.GetString("excluding_frame");
   do {
     for (size_t trajectory_id = 0; trajectory_id < bag_filenames.size();
          ++trajectory_id) {
@@ -221,8 +222,10 @@ void Run(const string& pose_graph_filename,
                 *delayed_message.instantiate<sensor_msgs::MultiEchoLaserScan>(),
                 tracking_frame, tf_buffer, transform_interpolation_buffer);
           } else if (delayed_message.isType<sensor_msgs::LaserScan>()) {
+	    auto ptr = delayed_message.instantiate<sensor_msgs::LaserScan>();
+	    if(frame_to_be_excluded.find(ptr->header.frame_id) == string::npos)
             points_batch = HandleMessage(
-                *delayed_message.instantiate<sensor_msgs::LaserScan>(),
+                *ptr,
                 tracking_frame, tf_buffer, transform_interpolation_buffer);
           }
           if (points_batch != nullptr) {
