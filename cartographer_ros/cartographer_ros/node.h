@@ -44,6 +44,10 @@
 namespace cartographer_ros {
 
 // Wires up ROS topics to SLAM.
+/**
+ * @brief 节点类,将 ROS topic和SLAM联系起来
+ * 
+ */
 class Node {
  public:
   Node(const NodeOptions& node_options, tf2_ros::Buffer* tf_buffer);
@@ -139,6 +143,7 @@ class Node {
   tf2_ros::TransformBroadcaster tf_broadcaster_;
 
   cartographer::common::Mutex mutex_;
+  // 作为建图工作和消息处理和发布工作的桥梁  !!!非常重要
   MapBuilderBridge map_builder_bridge_ GUARDED_BY(mutex_);
 
   ::ros::NodeHandle node_handle_;
@@ -163,14 +168,19 @@ class Node {
   };
 
   // These are keyed with 'trajectory_id'.
+  // 外推器,可以估计位姿
   std::map<int, ::cartographer::mapping::PoseExtrapolator> extrapolators_;
+  // 采样器,用于指定频率(百分比)采样
   std::unordered_map<int, TrajectorySensorSamplers> sensor_samplers_;
+  // 主题订阅器,用于将相应的消息处理函数绑定
   std::unordered_map<int, std::vector<Subscriber>> subscribers_;
+  // 订阅的主题列表
   std::unordered_set<std::string> subscribed_topics_;
   std::unordered_map<int, bool> is_active_trajectory_ GUARDED_BY(mutex_);
 
   // We have to keep the timer handles of ::ros::WallTimers around, otherwise
   // they do not fire.
+  // 定时器,用于按照指定时间频率publish需要的topic,如submap_list,trajectory_node_list等
   std::vector<::ros::WallTimer> wall_timers_;
 };
 

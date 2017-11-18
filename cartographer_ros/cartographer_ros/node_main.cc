@@ -47,10 +47,11 @@ void Run() {
       LoadOptions(FLAGS_configuration_directory, FLAGS_configuration_basename);
 
   Node node(node_options, &tf_buffer);
+  // 加载.pbstream中的稀疏位姿图
   if (!FLAGS_map_filename.empty()) {
     node.LoadMap(FLAGS_map_filename);
   }
-
+  // 开始第一条trajectory
   if (FLAGS_start_trajectory_with_default_topics) {
     node.StartTrajectoryWithDefaultTopics(trajectory_options);
   }
@@ -58,6 +59,7 @@ void Run() {
   ::ros::spin();
 
   node.FinishAllTrajectories();
+  // 优化
   node.RunFinalOptimization();
 
   if (!FLAGS_save_map_filename.empty()) {

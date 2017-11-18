@@ -35,7 +35,10 @@
 #include "visualization_msgs/MarkerArray.h"
 
 namespace cartographer_ros {
-
+/**
+ * @brief 地图构建和消息处理桥接类
+ * 
+ */
 class MapBuilderBridge {
  public:
   struct TrajectoryState {
@@ -70,11 +73,19 @@ class MapBuilderBridge {
 
  private:
   const NodeOptions node_options_;
+  /**
+   * @brief 用于地图构建 !!!非常重要
+   * 
+   */
   cartographer::mapping::MapBuilder map_builder_;
   tf2_ros::Buffer* const tf_buffer_;
 
   // These are keyed with 'trajectory_id'.
   std::unordered_map<int, TrajectoryOptions> trajectory_options_;
+  /**
+   * @brief 传感器桥,用于将传感器数据传入上层
+   * 
+   */
   std::unordered_map<int, std::unique_ptr<SensorBridge>> sensor_bridges_;
 };
 

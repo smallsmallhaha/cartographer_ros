@@ -83,6 +83,7 @@ Node::Node(const NodeOptions& node_options, tf2_ros::Buffer* const tf_buffer)
     : node_options_(node_options),
       map_builder_bridge_(node_options_, tf_buffer) {
   carto::common::MutexLocker lock(&mutex_);
+  // 初始化publisher
   submap_list_publisher_ =
       node_handle_.advertise<::cartographer_ros_msgs::SubmapList>(
           kSubmapListTopic, kLatestOnlyPublisherQueueSize);
@@ -92,6 +93,7 @@ Node::Node(const NodeOptions& node_options, tf2_ros::Buffer* const tf_buffer)
   constraint_list_publisher_ =
       node_handle_.advertise<::visualization_msgs::MarkerArray>(
           kConstraintListTopic, kLatestOnlyPublisherQueueSize);
+  // 定义服务,用于处理SubmapQuery,StartTrajectory,WriteState等消息请求
   service_servers_.push_back(node_handle_.advertiseService(
       kSubmapQueryServiceName, &Node::HandleSubmapQuery, this));
   service_servers_.push_back(node_handle_.advertiseService(
@@ -101,10 +103,11 @@ Node::Node(const NodeOptions& node_options, tf2_ros::Buffer* const tf_buffer)
   service_servers_.push_back(node_handle_.advertiseService(
       kWriteStateServiceName, &Node::HandleWriteState, this));
 
+  // 初始化scan_matched_point_cloud_publisher,用于发布包含匹配成功的点云的消息
   scan_matched_point_cloud_publisher_ =
       node_handle_.advertise<sensor_msgs::PointCloud2>(
           kScanMatchedPointCloudTopic, kLatestOnlyPublisherQueueSize);
-
+  // 使用时钟定时发布消息
   wall_timers_.push_back(node_handle_.createWallTimer(
       ::ros::WallDuration(node_options_.submap_publish_period_sec),
       &Node::PublishSubmapList, this));
@@ -145,6 +148,7 @@ void Node::AddExtrapolator(const int trajectory_id,
                 .imu_gravity_time_constant()
           : options.trajectory_builder_options.trajectory_builder_2d_options()
                 .imu_gravity_time_constant();
+  // 插入指定trajectory_id的位姿外推器
   extrapolators_.emplace(
       std::piecewise_construct, std::forward_as_tuple(trajectory_id),
       std::forward_as_tuple(
@@ -281,8 +285,11 @@ int Node::AddTrajectory(const TrajectoryOptions& options,
       ComputeExpectedTopics(options, topics);
   const int trajectory_id =
       map_builder_bridge_.AddTrajectory(expected_sensor_ids, options);
+  // 添加位姿外推器
   AddExtrapolator(trajectory_id, options);
+  // 添加 rangfinder imu odometry 的采样器
   AddSensorSamplers(trajectory_id, options);
+  // 添加并启动消息订阅器,接受并实时处理消息
   LaunchSubscribers(options, topics, trajectory_id);
   is_active_trajectory_[trajectory_id] = true;
   subscribed_topics_.insert(expected_sensor_ids.begin(),
