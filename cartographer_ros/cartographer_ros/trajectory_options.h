@@ -26,6 +26,10 @@
 
 namespace cartographer_ros {
 
+/**
+ * @brief Trajectory选项信息,在node.cc用来进行最初始的配置
+ * 
+ */
 struct TrajectoryOptions {
   ::cartographer::mapping::proto::TrajectoryBuilderOptions
       trajectory_builder_options;
@@ -43,6 +47,10 @@ struct TrajectoryOptions {
   double imu_sampling_ratio;
 };
 
+/**
+ * @brief 使用lua字典创建TrajectoryOptions对象
+ * 
+ */
 TrajectoryOptions CreateTrajectoryOptions(
     ::cartographer::common::LuaParameterDictionary* lua_parameter_dictionary);
 

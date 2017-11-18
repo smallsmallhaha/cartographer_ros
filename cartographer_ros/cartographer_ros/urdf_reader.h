@@ -23,7 +23,10 @@
 #include "tf2_ros/buffer.h"
 
 namespace cartographer_ros {
-
+/**
+ * @brief 读取urdf文件中的坐标变换信息
+ * 
+ */
 std::vector<geometry_msgs::TransformStamped> ReadStaticTransformsFromUrdf(
     const string& urdf_filename, tf2_ros::Buffer* tf_buffer);
 

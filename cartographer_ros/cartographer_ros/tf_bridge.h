@@ -37,6 +37,10 @@ class TfBridge {
 
   // Returns the transform for 'frame_id' to 'tracking_frame_' if it exists at
   // 'time'.
+  /**
+   * @brief 返回 frame_id 到 tracking_frame_ 的坐标转换
+   * 
+   */
   std::unique_ptr<::cartographer::transform::Rigid3d> LookupToTracking(
       ::cartographer::common::Time time, const string& frame_id) const;
 

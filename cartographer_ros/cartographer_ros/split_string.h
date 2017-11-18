@@ -23,6 +23,10 @@
 namespace cartographer_ros {
 
 // Split 'input' at 'delimiter'.
+/**
+ * @brief 分割字符串
+ * 
+ */
 std::vector<std::string> SplitString(const std::string& input, char delimiter);
 
 }  // namespace cartographer_ros
