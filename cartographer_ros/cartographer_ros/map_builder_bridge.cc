@@ -168,6 +168,7 @@ MapBuilderBridge::GetTrajectoryStates() {
         pose_estimate,
         map_builder_.sparse_pose_graph()->GetLocalToGlobalTransform(
             trajectory_id),
+            // ??? publish_frame 与 tracking_frame 的变换
         sensor_bridge.tf_bridge().LookupToTracking(
             pose_estimate.time,
             trajectory_options_[trajectory_id].published_frame),

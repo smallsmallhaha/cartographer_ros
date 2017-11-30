@@ -70,6 +70,7 @@ void Run(const string &pose_graph_filename,
   int count = 0;
 
   std::cout << begin_time.toNSec() << " " << end_time.toNSec() << endl;
+  std::cout << "time of .bag: " << (end_time-begin_time).toSec() << endl;
   for (const rosbag::MessageInstance& message : view) {
       
       if(message.getTopic().compare("/horizontal_laser_2d")==0)
@@ -88,8 +89,6 @@ void Run(const string &pose_graph_filename,
               ToPointCloudWithIntensities(laser_scan_message);
           CHECK_EQ(point_cloud.intensities.size(), point_cloud.points.size());
           CHECK_EQ(point_cloud.offset_seconds.size(), point_cloud.points.size());
-          
-          
           
       }      
       

@@ -34,6 +34,7 @@ std::unique_ptr<::cartographer::transform::Rigid3d> TfBridge::LookupToTracking(
   std::unique_ptr<::cartographer::transform::Rigid3d> frame_id_to_tracking;
   try {
     const ::ros::Time latest_tf_time =
+        // 坐标变换还是坐标系变换,谁到谁的变换
         buffer_
             ->lookupTransform(tracking_frame_, frame_id, ::ros::Time(0.),
                               timeout)

@@ -174,6 +174,7 @@ void Node::PublishTrajectoryStates(const ::ros::WallTimerEvent& timer_event) {
     auto& extrapolator = extrapolators_.at(entry.first);
     // We only publish a point cloud if it has changed. It is not needed at high
     // frequency, and republishing it would be computationally wasteful.
+    // 显示成功匹配的点云
     if (trajectory_state.pose_estimate.time != extrapolator.GetLastPoseTime()) {
       scan_matched_point_cloud_publisher_.publish(ToPointCloud2Message(
           carto::common::ToUniversal(trajectory_state.pose_estimate.time),
@@ -193,6 +194,7 @@ void Node::PublishTrajectoryStates(const ::ros::WallTimerEvent& timer_event) {
     const ::cartographer::common::Time now =
         std::max(FromRos(ros::Time::now()), extrapolator.GetLastPoseTime());
     stamped_transform.header.stamp = ToRos(now);
+    // 本地外推器获取的是 tracking_to_local 的坐标变换
     const Rigid3d tracking_to_local = extrapolator.ExtrapolatePose(now);
     const Rigid3d tracking_to_map =
         trajectory_state.local_to_map * tracking_to_local;
@@ -216,6 +218,7 @@ void Node::PublishTrajectoryStates(const ::ros::WallTimerEvent& timer_event) {
             tracking_to_local * (*trajectory_state.published_to_tracking));
         stamped_transforms.push_back(stamped_transform);
 
+        // 广播 map_frame -> odom_frame 和 odom_frame -> published_frame 的变换
         tf_broadcaster_.sendTransform(stamped_transforms);
       } else {
         stamped_transform.header.frame_id = node_options_.map_frame;
@@ -223,6 +226,7 @@ void Node::PublishTrajectoryStates(const ::ros::WallTimerEvent& timer_event) {
             trajectory_state.trajectory_options.published_frame;
         stamped_transform.transform = ToGeometryMsgTransform(
             tracking_to_map * (*trajectory_state.published_to_tracking));
+        // 广播 map_frame -> published_frame 的变换
         tf_broadcaster_.sendTransform(stamped_transform);
       }
     }

@@ -50,6 +50,7 @@ SensorBridge::SensorBridge(
 std::unique_ptr<::cartographer::sensor::OdometryData>
 SensorBridge::ToOdometryData(const nav_msgs::Odometry::ConstPtr& msg) {
   const carto::common::Time time = FromRos(msg->header.stamp);
+  // 将传感器坐标变换到traking_frame
   const auto sensor_to_tracking = tf_bridge_.LookupToTracking(
       time, CheckNoLeadingSlash(msg->child_frame_id));
   if (sensor_to_tracking == nullptr) {
@@ -58,6 +59,7 @@ SensorBridge::ToOdometryData(const nav_msgs::Odometry::ConstPtr& msg) {
   return ::cartographer::common::make_unique<
       ::cartographer::sensor::OdometryData>(
       ::cartographer::sensor::OdometryData{
+          // 用什么inverse()干嘛
           time, ToRigid3d(msg->pose.pose) * sensor_to_tracking->inverse()});
 }
 
@@ -85,6 +87,8 @@ std::unique_ptr<::cartographer::sensor::ImuData> SensorBridge::ToImuData(
          "http://docs.ros.org/api/sensor_msgs/html/msg/Imu.html.";
 
   const carto::common::Time time = FromRos(msg->header.stamp);
+  
+  // 将传感器坐标变换到traking_frame
   const auto sensor_to_tracking = tf_bridge_.LookupToTracking(
       time, CheckNoLeadingSlash(msg->header.frame_id));
   if (sensor_to_tracking == nullptr) {
@@ -97,6 +101,7 @@ std::unique_ptr<::cartographer::sensor::ImuData> SensorBridge::ToImuData(
   return ::cartographer::common::make_unique<::cartographer::sensor::ImuData>(
       ::cartographer::sensor::ImuData{
           time,
+          // ???
           sensor_to_tracking->rotation() * ToEigen(msg->linear_acceleration),
           sensor_to_tracking->rotation() * ToEigen(msg->angular_velocity)});
 }
@@ -161,10 +166,12 @@ void SensorBridge::HandleRangefinder(const string& sensor_id,
                                      const carto::common::Time time,
                                      const string& frame_id,
                                      const carto::sensor::PointCloud& ranges) {
+  // 将传感器坐标变换到traking_frame
   const auto sensor_to_tracking =
       tf_bridge_.LookupToTracking(time, CheckNoLeadingSlash(frame_id));
   if (sensor_to_tracking != nullptr) {
     trajectory_builder_->AddRangefinderData(
+        // ???
         sensor_id, time, sensor_to_tracking->translation().cast<float>(),
         carto::sensor::TransformPointCloud(ranges,
                                            sensor_to_tracking->cast<float>()));
