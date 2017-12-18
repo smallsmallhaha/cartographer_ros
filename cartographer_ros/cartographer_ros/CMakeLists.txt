@@ -23,17 +23,6 @@ install(TARGETS cartographer_assets_writer
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
-google_binary(parse_pbstream_file
-  SRCS
-    _parse_pbstream_file.cc
-)
-
-install(TARGETS parse_pbstream_file
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
 google_binary(cartographer_node
   SRCS
     node_main.cc
@@ -88,3 +77,5 @@ install(TARGETS cartographer_rosbag_validate
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
+
+add_subdirectory(evaluation)
