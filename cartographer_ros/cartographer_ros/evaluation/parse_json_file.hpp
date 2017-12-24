@@ -37,6 +37,7 @@ std::ostream &operator<<(std::ostream &out, PointsPtr &ps) {
   return out;
 }
 
+// 解析含有时间戳的点坐标数据文件，返回点集
 PointsPtr ParseJsonFile(const std::string &filename) {
   namespace pt = boost::property_tree;
 
@@ -62,7 +63,7 @@ PointsPtr ParseJsonFile(const std::string &filename) {
     ss << timestamp;
     ss >> year >> month >> day >> hour >> minute >> second >> nanosecond;
 
-    // the scale of cartographer::common::Time is 100ns
+    // cartographer::common::Time 以 100ns 为一个最小单位
     cartographer::common::Time time = cartographer::common::FromUniversal(
         (hour * 3600 + minute * 60 + second) * 10000000 + nanosecond / 100);
 

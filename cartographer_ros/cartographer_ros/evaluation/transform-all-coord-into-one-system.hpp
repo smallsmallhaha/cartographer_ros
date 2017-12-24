@@ -1,3 +1,8 @@
+/**
+ * 本文件将从多个文件中读取到的点坐标数据变换到一个公共坐标系下
+ * 
+ */
+
 #ifndef TRANSFORM_INTO_ONE_COORD_SYSTEM_HPP
 #define TRANSFORM_INTO_ONE_COORD_SYSTEM_HPP
 
@@ -9,11 +14,13 @@ using std::cout;
 using std::endl;
 using std::vector;
 
+// 对应点，两个不同坐标系下的同一控制点坐标是一对对应点，用于坐标变换
 struct CorrespondingPoints {
   Point *p1;
   Point *p2;
 };
 
+// 坐标转换价值函数
 class TransformCostFunctor {
 public:
   TransformCostFunctor(vector<vector<double>> data) : data_(data) {}
@@ -42,7 +49,7 @@ private:
   vector<vector<double>> data_;
 };
 
-// get common control_point from two cloud
+// 获取两个坐标系下的公共点坐标
 vector<CorrespondingPoints> GetCommonControlPoints(PointsPtr &pts1,
                                                    PointsPtr &pts2) {
   vector<CorrespondingPoints> cpts;
@@ -73,14 +80,14 @@ vector<CorrespondingPoints> GetCommonControlPoints(PointsPtr &pts1,
   return cpts;
 }
 
-// get transform between two pointclouds
+// 计算两个坐标系下的转换，用到了ceres
 vector<double> ComputeTransformBetweenTwoStation(PointsPtr &pts1,
                                                  PointsPtr &pts2) {
   auto cpts = GetCommonControlPoints(pts1, pts2);
 
   if (cpts.size() < 2) {
-    cout << "ERROR:  common control points too few" << endl;
-    exit(2);
+    LOG(WARNING) << "common control points too few, transform failed";
+    return vector<double>();
   }
 
   ceres::Problem problem;
@@ -106,25 +113,36 @@ vector<double> ComputeTransformBetweenTwoStation(PointsPtr &pts1,
   return {transform[0], transform[1], transform[2]};
 }
 
-PointsPtr load_all_json_files_and_convert_into_one_coord_system(
-    vector<std::string> filenames) {
+// 加载filenames中所有文件的坐标数据，返回它们在同一坐标系下的坐标数据（不含控制点）
+PointsPtr
+LoadAllJsonFilesAndConvertIntoOneSystem(vector<std::string> filenames) {
   vector<PointsPtr> all_points;
   // load all measurement data
   for (auto it = filenames.begin(); it != filenames.end();) {
     PointsPtr points_ptr = ParseJsonFile(*it);
     // if parse file error, delete it from filenames
     if (points_ptr != nullptr) {
+      LOG(INFO) << "load file \"" << *it << "\" success";
       all_points.push_back(points_ptr);
       ++it;
     } else {
+      LOG(ERROR) << "load file \"" << *it << "\" failed";
       it = filenames.erase(it);
     }
   }
 
   // transform into one system
   PointsPtr trajectory_points_in_one_system(new Points);
-  if (all_points.size() == 1) {
-    return all_points[0];
+  if (all_points.size() == 0) {
+    LOG(ERROR) << "0 point data file found, exit.";
+    exit(1);
+  } else if (all_points.size() == 1) {
+    std::for_each(all_points[0]->begin(), all_points[0]->end(),
+                  [&trajectory_points_in_one_system](Point &p) {
+                    if (!p.is_control_point)
+                      trajectory_points_in_one_system->push_back(p);
+                  });
+    return trajectory_points_in_one_system;
   } else if (all_points.size() == 2) {
     for (std::size_t i = 0; i < all_points.size() - 1; ++i) {
 
@@ -164,7 +182,7 @@ PointsPtr load_all_json_files_and_convert_into_one_coord_system(
 
     return trajectory_points_in_one_system;
   } else {
-    cout << "ERROR: three or more files not supported yet!!!" << endl;
+    LOG(ERROR) << "three or more files not supported yet, exit.";
     exit(1);
   }
 }
