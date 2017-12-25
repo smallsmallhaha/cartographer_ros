@@ -28,15 +28,6 @@ std::ostream &operator<<(std::ostream &out, Point &p) {
   return out;
 }
 
-std::ostream &operator<<(std::ostream &out, PointsPtr &ps) {
-  for (auto it = ps->begin(); it != ps->end(); ++it) {
-    Point &p = *it;
-    out << p.name << " " << p.timestamp << " " << p.is_control_point << " "
-        << p.x << " " << p.y << " " << p.z;
-  }
-  return out;
-}
-
 // 解析含有时间戳的点坐标数据文件，返回点集
 PointsPtr ParseJsonFile(const std::string &filename) {
   namespace pt = boost::property_tree;
@@ -71,6 +62,46 @@ PointsPtr ParseJsonFile(const std::string &filename) {
   }
 
   return points_ptr;
+}
+
+bool WriteJsonFile(const std::string &filename, const PointsPtr &points_ptr,
+                   const std::vector<std::vector<double>> &trajecotry_nodes,
+                   const std::vector<double> &transform) {
+  namespace pt = boost::property_tree;
+
+  pt::ptree root, trajecotry_nodes_node, points_node, transform_node;
+
+  for (auto it = points_ptr->begin(); it != points_ptr->end(); ++it) {
+    pt::ptree point_node;
+    point_node.put("name", it->name);
+    point_node.put("timestamp",
+                   cartographer::common::ToUniversal(it->timestamp));
+    point_node.put("is_control_point", it->is_control_point);
+    point_node.put("x", it->x);
+    point_node.put("y", it->y);
+    point_node.put("z", it->z);
+    points_node.push_back(make_pair("", point_node));
+  }
+
+  root.put_child("points", points_node);
+
+  for (auto it = trajecotry_nodes.begin(); it != trajecotry_nodes.end(); ++it) {
+  }
+
+  root.put_child("trajecotry_nodes", trajecotry_nodes_node);
+
+  {
+    transform_node.put("x", transform[0]);
+    transform_node.put("y", transform[1]);
+    transform_node.put("theta", transform[2]);
+    transform_node.put("delta_time", int64(transform[2]));
+  }
+
+  root.put_child("transform", transform_node);
+
+  pt::write_json(filename, root);
+
+  return true;
 }
 
 #endif

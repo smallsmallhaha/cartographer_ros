@@ -26,21 +26,10 @@ install(TARGETS cartographer_parse_pbstream_file
 
 google_binary(cartographer_compute-error-with-ground-truth
   SRCS
-    _compute-error-with-ground-truth.cc
+    compute-error-with-ground-truth.cc
 )
 
 install(TARGETS cartographer_compute-error-with-ground-truth
-  ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
-  RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
-)
-
-google_binary(cartographer_compute-error-with-ground-truth2
-  SRCS
-    _compute-error-with-ground-truth2.cc
-)
-
-install(TARGETS cartographer_compute-error-with-ground-truth2
   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}

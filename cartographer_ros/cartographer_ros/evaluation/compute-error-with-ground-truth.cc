@@ -56,9 +56,6 @@ DEFINE_string(point_filenames, "", "Points data with timestamp infomation "
                                    "in json format.");
 DEFINE_string(pose_graph_filename, "",
               "Proto stream file containing the pose graph.");
-DEFINE_string(bag_filenames, "",
-              "Bags to process, must be in the same order as the trajectories "
-              "in 'pose_graph_filename'.");
 
 using namespace ::cartographer_ros;
 namespace carto = ::cartographer;
@@ -86,14 +83,6 @@ public:
         latest_point_index_ = i;
     }
 
-    cout << earliest_point_index_ << " " << latest_point_index_ << endl;
-
-    cout << transform_interpolation_buffer.earliest_time() << " "
-         << transform_interpolation_buffer.latest_time() << endl;
-
-    cout << (*points_)[earliest_point_index_] << " "
-         << (*points_)[latest_point_index_] << endl;
-
     min_delta_t =
         carto::common::ToUniversal(
             transform_interpolation_buffer_.earliest_time()) -
@@ -116,9 +105,10 @@ public:
     double c = cos(transform[2]);
     int64 delta_t = static_cast<int64>(transform[3]);
     delta_t = carto::common::Clamp(delta_t, min_delta_t, max_delta_t);
-    // to do
-    //     (*(double **)transform)[3] = delta_t;  // program crashed
-    //     cout << transform[3] << " " << delta_t << endl;
+    // 这里的时间偏移值应该在一定范围内，而ceres-solver没有给出这种限制，
+    // 只能在这里每一次都将transform[3]调整到合适范围内
+    // warning: it is an Undefined Behavior in C++
+    const_cast<double *>(transform)[3] = delta_t;
     for (std::size_t i = 0; i < points_->size(); ++i) {
       Point &point = (*points_)[i];
       double x1 = point.x;
@@ -152,14 +142,28 @@ private:
       &transform_interpolation_buffer_;
 };
 
-void GetCurve(const string &pose_graph_filename, vector<vector<double>> &curve);
+// 获取 trajectory_nodes
+void GetCurve(const carto::mapping::proto::SparsePoseGraph &pose_graph_proto,
+              vector<vector<double>> &curve) {
+  for (const carto::mapping::proto::Trajectory::Node &node :
+       pose_graph_proto.trajectory(0).node()) {
+    const ::carto::transform::Rigid3d pose =
+        carto::transform::ToRigid3(node.pose());
+    Eigen::Matrix<double, 3, 1> translation = pose.translation();
+    curve.push_back({translation(0, 0), translation(1, 0)});
+  }
+}
 
-void Run(const string &pose_graph_filename, const string &bag_filenames,
+void Run(const string &pose_graph_filename,
          const std::vector<string> &point_filenames) {
 
   carto::io::ProtoStreamReader reader(pose_graph_filename);
   carto::mapping::proto::SparsePoseGraph pose_graph_proto;
   reader.ReadProto(&pose_graph_proto);
+  vector<vector<double>> curve;
+
+  // 获取位姿曲线
+  GetCurve(pose_graph_proto, curve);
 
   const carto::transform::TransformInterpolationBuffer
       transform_interpolation_buffer(pose_graph_proto.trajectory(0));
@@ -168,10 +172,6 @@ void Run(const string &pose_graph_filename, const string &bag_filenames,
       LoadAllJsonFilesAndConvertIntoOneSystem(point_filenames);
 
   double transform[] = {34.7, 3.16, 1.57, 0};
-
-  vector<vector<double>> curve;
-  // 获取位姿曲线
-  GetCurve(pose_graph_filename, curve);
 
   // 使用 ceres 计算标准路径点坐标到位姿曲线的拟合误差
   ceres::Problem problem;
@@ -187,61 +187,29 @@ void Run(const string &pose_graph_filename, const string &bag_filenames,
       nullptr, transform);
 
   ceres::Solver::Options options;
-  //   options.minimizer_progress_to_stdout = true;
+  options.minimizer_progress_to_stdout = true;
   ceres::Solver::Summary summary;
   ceres::Solve(options, &problem, &summary);
 
-  //   cout << summary.FullReport() << endl;
-  cout << summary.BriefReport() << endl;
-  cout << transform[0] << " " << transform[1] << " " << transform[2] << endl;
+  LOG(INFO) << summary.BriefReport() << endl;
+  LOG(INFO) << "x: " << transform[0] << ", y: " << transform[1]
+            << ", theta: " << transform[2];
+  LOG(INFO) << "point error: "
+            << sqrt(summary.final_cost * 2 / (points_ptr->size() * 2 - 3));
+
+  WriteJsonFile(point_filenames[0] + ".result", points_ptr, curve,
+                vector<double>(transform, transform + 4));
 }
 
 int main(int argc, char **argv) {
-
   FLAGS_alsologtostderr = true;
   google::InitGoogleLogging(argv[0]);
   google::ParseCommandLineFlags(&argc, &argv, true);
 
-  //     CHECK(!FLAGS_bag_filenames.empty()) << "-bag_filenames is missing.";
   CHECK(!FLAGS_pose_graph_filename.empty())
       << "-pose_graph_filename is missing.";
   CHECK(!FLAGS_point_filenames.empty()) << "-point_filenames is missing.";
 
-  Run(FLAGS_pose_graph_filename, FLAGS_bag_filenames,
+  Run(FLAGS_pose_graph_filename,
       cartographer_ros::SplitString(FLAGS_point_filenames, ','));
-}
-
-// 获取要拟合的曲线
-void GetCurve(const string &pose_graph_filename,
-              vector<vector<double>> &curve) {
-  carto::io::ProtoStreamReader reader(pose_graph_filename);
-  carto::mapping::proto::SparsePoseGraph pose_graph_proto;
-  reader.ReadProto(&pose_graph_proto);
-
-  const carto::transform::TransformInterpolationBuffer
-      transform_interpolation_buffer(pose_graph_proto.trajectory(0));
-
-  {
-    auto nodes = pose_graph_proto.trajectory(0).node();
-    auto submaps = pose_graph_proto.trajectory(0).submap();
-
-    //     cout << "node count: " << nodes.size() << endl;
-    //     cout << "submap count: " << submaps.size() << endl;
-
-    for (const carto::mapping::proto::Trajectory::Node &node :
-         pose_graph_proto.trajectory(0).node()) {
-      const ::carto::transform::Rigid3d pose =
-          carto::transform::ToRigid3(node.pose());
-      Eigen::Matrix<double, 3, 1> translation = pose.translation();
-      //       cout << translation;
-      curve.push_back({translation(0, 0), translation(1, 0)});
-    }
-  }
-
-  cartographer::common::Time time;
-  if (transform_interpolation_buffer.Has(time)) {
-    const carto::transform::Rigid3d tracking_to_map =
-        transform_interpolation_buffer.Lookup(time);
-    std::cout << "time in" << std::endl;
-  }
 }
