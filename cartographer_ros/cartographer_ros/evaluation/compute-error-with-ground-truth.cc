@@ -68,9 +68,11 @@ class CostFunctor {
 public:
   CostFunctor(vector<vector<double>> &curve, const PointsPtr &points,
               const carto::transform::TransformInterpolationBuffer
-                  &transform_interpolation_buffer)
+                  &transform_interpolation_buffer,
+              bool auto_adjust_delta_t)
       : curve_(curve), points_(points),
-        transform_interpolation_buffer_(transform_interpolation_buffer) {
+        transform_interpolation_buffer_(transform_interpolation_buffer),
+        auto_adjust_delta_t_(auto_adjust_delta_t) {
     CHECK_GT(points_->size(), 0);
 
     std::size_t earliest_point_index_ = 0;
@@ -92,7 +94,8 @@ public:
             transform_interpolation_buffer_.latest_time()) -
         carto::common::ToUniversal((*points_)[latest_point_index_].timestamp);
 
-    CHECK_GE(max_delta_t, min_delta_t);
+    CHECK_GE(max_delta_t, min_delta_t)
+        << "measurement data too much, please remove some";
   }
 
   CostFunctor(const CostFunctor &) = delete;
@@ -104,20 +107,27 @@ public:
     double s = sin(transform[2]);
     double c = cos(transform[2]);
     int64 delta_t = static_cast<int64>(transform[3]);
-    delta_t = carto::common::Clamp(delta_t, min_delta_t, max_delta_t);
-    // 这里的时间偏移值应该在一定范围内，而ceres-solver没有给出这种限制，
-    // 只能在这里每一次都将transform[3]调整到合适范围内
-    // warning: it is an Undefined Behavior in C++
-    const_cast<double *>(transform)[3] = delta_t;
+    if (auto_adjust_delta_t_) {
+      // delta_t = carto::common::Clamp(delta_t, min_delta_t, max_delta_t);
+      if (delta_t < min_delta_t || delta_t > max_delta_t)
+        delta_t = (min_delta_t + max_delta_t) / 2;
+      // 这里的时间偏移值应该在一定范围内，而ceres-solver没有给出这种限制，
+      // 只能在这里每一次都将transform[3]调整到合适范围内
+      // warning: it is an Undefined Behavior in C++
+      const_cast<double *>(transform)[3] = delta_t;
+    } else {
+      delta_t = 0;
+    }
     for (std::size_t i = 0; i < points_->size(); ++i) {
       Point &point = (*points_)[i];
-      double x1 = point.x;
-      double y1 = point.y;
+      // transform: translation -> rotation
+      double x1 = point.x + dx;
+      double y1 = point.y + dy;
       auto vector_xy = GetPose(point.timestamp, delta_t);
       double x2 = vector_xy[0];
       double y2 = vector_xy[1];
-      residual[2 * i + 0] = x1 * c + y1 * s + dx - x2;
-      residual[2 * i + 1] = y1 * c - x1 * s + dy - y2;
+      residual[2 * i + 0] = x1 * c + y1 * s - x2;
+      residual[2 * i + 1] = y1 * c - x1 * s - y2;
     }
     return true;
   }
@@ -127,7 +137,8 @@ private:
                          const int64 &delta_t) const {
     carto::common::Time time =
         carto::common::FromUniversal(carto::common::ToUniversal(t) + delta_t);
-    CHECK_EQ(transform_interpolation_buffer_.Has(time), true);
+    CHECK_EQ(transform_interpolation_buffer_.Has(time), true)
+        << min_delta_t + delta_t << " " << max_delta_t + delta_t;
     carto::transform::Rigid3d pose =
         transform_interpolation_buffer_.Lookup(time);
     auto translation = pose.translation();
@@ -140,6 +151,8 @@ private:
   const PointsPtr &points_;
   const carto::transform::TransformInterpolationBuffer
       &transform_interpolation_buffer_;
+
+  bool auto_adjust_delta_t_;
 };
 
 // 获取 trajectory_nodes
@@ -171,7 +184,7 @@ void Run(const string &pose_graph_filename,
   PointsPtr points_ptr =
       LoadAllJsonFilesAndConvertIntoOneSystem(point_filenames);
 
-  double transform[] = {34.7, 3.16, 1.57, 0};
+  double transform[] = {-1038.46, -1002.35, 2.90, 0};
 
   // 使用 ceres 计算标准路径点坐标到位姿曲线的拟合误差
   ceres::Problem problem;
@@ -182,7 +195,8 @@ void Run(const string &pose_graph_filename,
                                          ceres::NumericDiffMethodType::CENTRAL,
                                          ceres::DYNAMIC, 4>(
           // 参数为残差方程实参和残差个数
-          new CostFunctor(curve, points_ptr, transform_interpolation_buffer),
+          new CostFunctor(curve, points_ptr, transform_interpolation_buffer,
+                          true),
           ceres::Ownership::TAKE_OWNERSHIP, points_ptr->size() * 2),
       nullptr, transform);
 
@@ -193,7 +207,8 @@ void Run(const string &pose_graph_filename,
 
   LOG(INFO) << summary.BriefReport() << endl;
   LOG(INFO) << "x: " << transform[0] << ", y: " << transform[1]
-            << ", theta: " << transform[2];
+            << ", theta: " << transform[2]
+            << ", delta_t: " << transform[3] / 1e7;
   LOG(INFO) << "point error: "
             << sqrt(summary.final_cost * 2 / (points_ptr->size() * 2 - 3));
 
