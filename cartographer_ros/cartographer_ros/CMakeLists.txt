@@ -153,3 +153,5 @@ if (${BUILD_GRPC})
     DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
   )
 endif()
+
+add_subdirectory(tools)
