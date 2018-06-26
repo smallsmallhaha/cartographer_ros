@@ -43,7 +43,13 @@ void OutputPoseToFile(std::ostream& out,
   for (auto it = nodes.begin(); it != nodes.end(); ++it) {
     carto::mapping::proto::Trajectory_Node& node = *it;
     carto::transform::proto::Vector3d trans = node.pose().translation();
-    out << node.timestamp() << ", " << trans.x() << ", " << trans.y() << endl;
+    int64_t uts_timestamp = node.timestamp();
+    int64_t ns_since_unix_epoch =
+        (uts_timestamp -
+         carto::common::kUtsEpochOffsetFromUnixEpochInSeconds * 10000000ll) *
+        100ll;
+    out << ns_since_unix_epoch << ", " << trans.x() << ", " << trans.y()
+        << endl;
   }
 }
 
