@@ -70,9 +70,9 @@ CreatePipelineBuilder(
                         carto::common::LuaParameterDictionary* const dictionary,
                         carto::io::PointsProcessor* const next)
                         -> std::unique_ptr<carto::io::PointsProcessor> {
-                      return RosMapWritingPointsProcessor::FromDictionary(
-                          file_writer_factory, dictionary, next);
-                    });
+                          return RosMapWritingPointsProcessor::FromDictionary(
+                              file_writer_factory, dictionary, next);
+                        });
   return builder;
 }
 
@@ -94,9 +94,12 @@ std::unique_ptr<carto::common::LuaParameterDictionary> LoadLuaDictionary(
 template <typename T>
 std::unique_ptr<carto::io::PointsBatch> HandleMessage(
     const T& message, const std::string& tracking_frame,
-    const tf2_ros::Buffer& tf_buffer,
+    const std::string& mapping_frame, const tf2_ros::Buffer& tf_buffer,
     const carto::transform::TransformInterpolationBuffer&
         transform_interpolation_buffer) {
+  if (mapping_frame.find(message.header.frame_id) == std::string::npos)
+    return nullptr;
+
   const carto::common::Time start_time = FromRos(message.header.stamp);
 
   auto points_batch = carto::common::make_unique<carto::io::PointsBatch>();
@@ -178,6 +181,8 @@ void AssetsWriter::Run(const std::string& configuration_directory,
           lua_parameter_dictionary->GetDictionary("pipeline").get());
   const std::string tracking_frame =
       lua_parameter_dictionary->GetString("tracking_frame");
+  const std::string mapping_frame =
+      lua_parameter_dictionary->GetString("mapping_frame");
 
   do {
     for (size_t trajectory_id = 0; trajectory_id < bag_filenames_.size();
@@ -224,8 +229,9 @@ void AssetsWriter::Run(const std::string& configuration_directory,
           }
         }
 
-        while (!delayed_messages.empty() && delayed_messages.front().getTime() <
-                                                message.getTime() - kDelay) {
+        while (!delayed_messages.empty() &&
+               delayed_messages.front().getTime() <
+                   message.getTime() - kDelay) {
           const rosbag::MessageInstance& delayed_message =
               delayed_messages.front();
 
@@ -233,16 +239,19 @@ void AssetsWriter::Run(const std::string& configuration_directory,
           if (delayed_message.isType<sensor_msgs::PointCloud2>()) {
             points_batch = HandleMessage(
                 *delayed_message.instantiate<sensor_msgs::PointCloud2>(),
-                tracking_frame, tf_buffer, transform_interpolation_buffer);
+                tracking_frame, mapping_frame, tf_buffer,
+                transform_interpolation_buffer);
           } else if (delayed_message
                          .isType<sensor_msgs::MultiEchoLaserScan>()) {
             points_batch = HandleMessage(
                 *delayed_message.instantiate<sensor_msgs::MultiEchoLaserScan>(),
-                tracking_frame, tf_buffer, transform_interpolation_buffer);
+                tracking_frame, mapping_frame, tf_buffer,
+                transform_interpolation_buffer);
           } else if (delayed_message.isType<sensor_msgs::LaserScan>()) {
             points_batch = HandleMessage(
                 *delayed_message.instantiate<sensor_msgs::LaserScan>(),
-                tracking_frame, tf_buffer, transform_interpolation_buffer);
+                tracking_frame, mapping_frame, tf_buffer,
+                transform_interpolation_buffer);
           }
           if (points_batch != nullptr) {
             points_batch->trajectory_id = trajectory_id;
